@@ -12,6 +12,7 @@ Semantic-DACVAE-32dim latents, 48 kHz). Mirror the Swift EchoTTS structure
 ## Done (committed)
 - [x] `IrodoriTTSConfig.swift` — full mirror of config.py (DiT/Sampler/Model configs,
       resolved-property logic, decodeIfPresent defaults). Commit 6a9bd88.
+- [x] `IrodoriDuration.swift` — 14-dim duration features (duration.py). Commit: see log.
 - [x] `IrodoriTTSText.swift` — JP normalisation (regex map, width folding, kana widening,
       bracket/punct stripping) + `irodoriEncodeText` (HF tokenizer, manual BOS, right-pad)
       + `IrodoriTTSError`. Commit c0c0a2d.
