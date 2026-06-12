@@ -35,20 +35,44 @@ public final class IrodoriTTSModel: Module, @unchecked Sendable {
 
     // MARK: - Weight sanitisation (mirror irodori_tts.py `sanitize`)
 
+    /// Remap PyTorch/MLX-community checkpoint keys (snake_case) to the Swift module
+    /// tree's keys. The DiT uses camelCase @ModuleInfo properties whose `key:` is
+    /// dropped by the `self._x = ModuleInfo(wrappedValue:)` init pattern, so each
+    /// path component must be camelCased to match (the same approach as EchoTTSModel).
     func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
+        // snake_case → camelCase, with the adaLN containers matching their property names.
+        func normalizedComponent(_ component: String) -> String {
+            switch component {
+            case "attention_adaln": return "attentionAdaLN"
+            case "mlp_adaln": return "mlpAdaLN"
+            default:
+                guard component.contains("_") else { return component }
+                let parts = component.split(separator: "_")
+                guard let head = parts.first else { return component }
+                return String(head) + parts.dropFirst().map {
+                    $0.prefix(1).uppercased() + $0.dropFirst()
+                }.joined()
+            }
+        }
+
         var out = [String: MLXArray]()
         out.reserveCapacity(weights.count)
         for (rawKey, v) in weights {
-            var k = rawKey
+            var bareKey = rawKey.hasPrefix("model.") ? String(rawKey.dropFirst("model.".count)) : rawKey
             // PyTorch Sequential integer keys → MLX nn.Sequential "layers.N"
-            if k.hasPrefix("cond_module.") {
-                let parts = k.split(separator: ".").map(String.init)
+            if bareKey.hasPrefix("cond_module.") {
+                var parts = bareKey.split(separator: ".").map(String.init)
                 if parts.count > 1, Int(parts[1]) != nil {
-                    k = (["cond_module", "layers", parts[1]] + parts[2...]).joined(separator: ".")
+                    parts.insert("layers", at: 1)
+                    bareKey = parts.joined(separator: ".")
                 }
             }
-            let outKey = k.hasPrefix("model.") ? k : "model.\(k)"
-            out[outKey] = v
+            // camelCase every non-numeric path component
+            let normalized = bareKey.split(separator: ".").map { part -> String in
+                let c = String(part)
+                return Int(c) == nil ? normalizedComponent(c) : c
+            }.joined(separator: ".")
+            out["model.\(normalized)"] = v
         }
         return out
     }
